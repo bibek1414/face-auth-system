@@ -1,0 +1,113 @@
+{% extends 'authentication/base.html' %}
+
+{% block title %}Register - Face Authentication System{% endblock %}
+
+{% block content %}
+<div class="auth-container">
+    <h2 class="mb-4">Create Your Account</h2>
+    
+    <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        
+        <div class="row mb-3">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>Account Information</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label for="{{ form.username.id_for_label }}" class="form-label">Username</label>
+                            {{ form.username|add_class:"form-control" }}
+                            {% if form.username.errors %}
+                            <div class="text-danger">
+                                {{ form.username.errors }}
+                            </div>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="{{ form.email.id_for_label }}" class="form-label">Email</label>
+                            {{ form.email|add_class:"form-control" }}
+                            {% if form.email.errors %}
+                            <div class="text-danger">
+                                {{ form.email.errors }}
+                            </div>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="{{ form.password1.id_for_label }}" class="form-label">Password</label>
+                            {{ form.password1|add_class:"form-control" }}
+                            {% if form.password1.errors %}
+                            <div class="text-danger">
+                                {{ form.password1.errors }}
+                            </div>
+                            {% endif %}
+                            <div class="form-text">{{ form.password1.help_text }}</div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="{{ form.password2.id_for_label }}" class="form-label">Confirm Password</label>
+                            {{ form.password2|add_class:"form-control" }}
+                            {% if form.password2.errors %}
+                            <div class="text-danger">
+                                {{ form.password2.errors }}
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>Face Registration (Optional)</h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="mb-3">Register your face for biometric login (recommended).</p>
+                        
+                        <!-- Webcam capture container -->
+                        <div id="webcam-container" class="webcam-container mb-3"></div>
+                        
+                        <!-- Preview container -->
+                        <div class="preview-container mb-3">
+                            <img id="face-preview" class="preview-image" src="" alt="Face Preview">
+                        </div>
+                        
+                        <!-- Hidden input to store face data -->
+                        <input type="hidden" id="face-data" name="face_data">
+                        
+                        <!-- Capture buttons -->
+                        <div class="button-container">
+                            <button type="button" id="capture-btn" class="btn btn-primary">Capture Face</button>
+                            <button type="button" id="retake-btn" class="btn btn-secondary">Retake</button>
+                        </div>
+                        
+                        <!-- Feedback area -->
+                        <div id="face-feedback" class="alert mt-3" style="display: none;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="d-grid gap-2">
+            <button type="submit" class="btn btn-success btn-lg">Create Account</button>
+        </div>
+        
+        <div class="text-center mt-3">
+            <p>Already have an account? <a href="{% url 'authentication:login' %}">Login here</a></p>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Initialize webcam
+        initWebcam('webcam-container', 'face-data', 'face-preview', 'capture-btn', 'retake-btn', 'face-feedback');
+    });
+</script>
+{% endblock %}

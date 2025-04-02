@@ -1,0 +1,126 @@
+{% extends 'authentication/base.html' %}
+
+{% block title %}Profile - Face Authentication System{% endblock %}
+
+{% block content %}
+<div class="auth-container">
+    <h2 class="mb-4">Edit Your Profile</h2>
+    
+    <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        
+        <div class="row">
+            <div class="col-md-6">
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5>Profile Information</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label for="{{ form.first_name.id_for_label }}" class="form-label">First Name</label>
+                            {{ form.first_name|add_class:"form-control" }}
+                            {% if form.first_name.errors %}
+                            <div class="text-danger">
+                                {{ form.first_name.errors }}
+                            </div>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="{{ form.last_name.id_for_label }}" class="form-label">Last Name</label>
+                            {{ form.last_name|add_class:"form-control" }}
+                            {% if form.last_name.errors %}
+                            <div class="text-danger">
+                                {{ form.last_name.errors }}
+                            </div>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="{{ form.phone_number.id_for_label }}" class="form-label">Phone Number</label>
+                            {{ form.phone_number|add_class:"form-control" }}
+                            {% if form.phone_number.errors %}
+                            <div class="text-danger">
+                                {{ form.phone_number.errors }}
+                            </div>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="mb-3 form-check">
+                            {{ form.enable_2fa|add_class:"form-check-input" }}
+                            <label for="{{ form.enable_2fa.id_for_label }}" class="form-check-label">Enable Two-Factor Authentication</label>
+                            {% if form.enable_2fa.errors %}
+                            <div class="text-danger">
+                                {{ form.enable_2fa.errors }}
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>Face Registration</h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="mb-3">
+                            {% if has_face_data %}
+                                Update your face for biometric login.
+                            {% else %}
+                                Register your face for biometric login.
+                            {% endif %}
+                        </p>
+                        
+                        <!-- Webcam capture container -->
+                        <div id="webcam-container" class="webcam-container mb-3"></div>
+                        
+                        <!-- Preview container -->
+                        <div class="preview-container mb-3">
+                            <img id="face-preview" class="preview-image" src="" alt="Face Preview">
+                        </div>
+                        
+                        <!-- Hidden input to store face data -->
+                        <input type="hidden" id="face-data" name="face_data">
+                        
+                        <!-- Capture buttons -->
+                        <div class="button-container">
+                            <button type="button" id="capture-btn" class="btn btn-primary">Capture Face</button>
+                            <button type="button" id="retake-btn" class="btn btn-secondary">Retake</button>
+                        </div>
+                        
+                        <!-- Feedback area -->
+                        <div id="face-feedback" class="alert mt-3" style="display: none;"></div>
+                        
+                        {% if has_face_data %}
+                        <div class="alert alert-info mt-3">
+                            <i class="bi bi-info-circle"></i> You already have face data registered. Capturing a new image will replace your existing face data.
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="d-grid gap-2 mt-4">
+            <button type="submit" class="btn btn-success btn-lg">Save Changes</button>
+        </div>
+    </form>
+    
+    <div class="mt-4">
+        <a href="{% url 'authentication:dashboard' %}" class="btn btn-secondary">Back to Dashboard</a>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<!-- Bootstrap Icons -->
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Initialize webcam
+        initWebcam('webcam-container', 'face-data', 'face-preview', 'capture-btn', 'retake-btn', 'face-feedback');
+    });
+</script>
+{% endblock %}

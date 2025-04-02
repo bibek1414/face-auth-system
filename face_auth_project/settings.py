@@ -9,8 +9,7 @@ load_dotenv()
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-key-for-development-only')
-
+SECRET_KEY = os.getenv('SECRET_KEY',)
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv('DEBUG', 'False').lower() == 'true'
 
@@ -27,6 +26,9 @@ INSTALLED_APPS = [
     'crispy_forms',
     'crispy_tailwind',
     'authentication',
+    'widget_tweaks',
+
+    
 ]
 
 MIDDLEWARE = [
@@ -126,6 +128,7 @@ CRISPY_ALLOWED_TEMPLATE_PACKS = "tailwind"
 CRISPY_TEMPLATE_PACK = "tailwind"
 
 # Security settings
+# In settings.py
 if not DEBUG:
     # HTTPS settings
     SESSION_COOKIE_SECURE = True
@@ -136,7 +139,12 @@ if not DEBUG:
     SECURE_HSTS_SECONDS = 31536000  # 1 year
     SECURE_HSTS_PRELOAD = True
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
-    
+else:
+    # Disable secure cookies and SSL redirection during local development
+    SESSION_COOKIE_SECURE = False
+    CSRF_COOKIE_SECURE = False
+    SECURE_SSL_REDIRECT = False
+  
     # Additional security settings
     SECURE_CONTENT_TYPE_NOSNIFF = True
     SECURE_BROWSER_XSS_FILTER = True

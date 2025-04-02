@@ -1,0 +1,129 @@
+{% extends 'authentication/base.html' %}
+{% load static %}
+{% block title %}Dashboard - Face Authentication System{% endblock %}
+
+{% block content %}
+<div class="auth-container">
+    <h2 class="mb-4">Welcome, {{ user.username }}!</h2>
+    
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5>Account Information</h5>
+                </div>
+                <div class="card-body">
+                    <p><strong>Username:</strong> {{ user.username }}</p>
+                    <p><strong>Email:</strong> {{ user.email }}</p>
+                    <p><strong>Joined:</strong> {{ user.date_joined|date:"F j, Y" }}</p>
+                    <p><strong>Face Recognition:</strong> 
+                        {% if has_face_data %}
+                            <span class="badge bg-success">Enabled</span>
+                        {% else %}
+                            <span class="badge bg-warning">Not Set Up</span>
+                        {% endif %}
+                    </p>
+                    
+                    <div class="d-grid gap-2 mt-4">
+                        <a href="{% url 'authentication:profile' %}" class="btn btn-primary">Edit Profile</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5>Security Status</h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="flex-shrink-0">
+                            <i class="bi bi-shield-check fs-3 {% if has_face_data %}text-success{% else %}text-warning{% endif %}"></i>
+                        </div>
+                        <div class="flex-grow-1 ms-3">
+                            <h5 class="mb-0">Multi-factor Authentication</h5>
+                            <p class="mb-0">
+                                {% if has_face_data %}
+                                    Your account is protected with facial recognition.
+                                {% else %}
+                                    Add facial recognition for better security.
+                                {% endif %}
+                            </p>
+                        </div>
+                    </div>
+                    
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="flex-shrink-0">
+                            <i class="bi bi-fingerprint fs-3 text-primary"></i>
+                        </div>
+                        <div class="flex-grow-1 ms-3">
+                            <h5 class="mb-0">Biometric Security</h5>
+                            <p class="mb-0">Your face is your password.</p>
+                        </div>
+                    </div>
+                    
+                    <div class="d-flex align-items-center">
+                        <div class="flex-shrink-0">
+                            <i class="bi bi-shield-lock fs-3 text-info"></i>
+                        </div>
+                        <div class="flex-grow-1 ms-3">
+                            <h5 class="mb-0">Digital Signatures</h5>
+                            <p class="mb-0">Login sessions are cryptographically verified.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="login-history">
+        <h3>Recent Login Activity</h3>
+        <div class="table-responsive">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Date & Time</th>
+                        <th>Status</th>
+                        <th>IP Address</th>
+                        <th>User Agent</th>
+                        <th>Face Match</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for log in login_logs %}
+                    <tr>
+                        <td>{{ log.timestamp|date:"M d, Y" }} at {{ log.timestamp|time:"H:i" }}</td>
+                        <td>
+                            {% if log.successful %}
+                                <span class="badge bg-success">Success</span>
+                            {% else %}
+                                <span class="badge bg-danger">Failed</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ log.ip_address }}</td>
+                        <td><small class="text-muted">{{ log.user_agent|truncatechars:50 }}</small></td>
+                        <td>
+                            {% if log.face_match_score %}
+                                {{ log.face_match_score|floatformat:1 }}%
+                            {% else %}
+                                <span class="text-muted">N/A</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5" class="text-center">No login history available</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<!-- Bootstrap Icons -->
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+{% endblock %}

@@ -9,12 +9,12 @@ from django.conf import settings
 from datetime import timedelta
 import json
 import base64
-
+import logging
 from .forms import CustomUserCreationForm, CustomAuthenticationForm, UserProfileForm
 from .models import UserProfile, LoginLog, DigitalSignature
 from .face_utils import process_face_image, compare_faces
 from .crypto_utils import create_login_challenge, sign_login_challenge, verify_login_signature
-
+logger = logging.getLogger(__name__)
 def register_view(request):
     if request.method == 'POST':
         form = CustomUserCreationForm(request.POST, request.FILES)
@@ -89,10 +89,15 @@ def login_view(request):
             messages.error(request, "Invalid username or password.")
             return render(request, 'authentication/login.html', {'form': form})
         
+        # Check if profile exists and create if it doesn't
+        try:
+            profile = UserProfile.objects.get(user=user)
+        except UserProfile.DoesNotExist:
+            profile = UserProfile.objects.create(user=user)
+            messages.info(request, "User profile was created.")
+        
         # Check if account is locked
-        profile = UserProfile.objects.get(user=user)
         if profile.is_locked:
-            # Check if lockout period has expired
             lockout_time = settings.LOCKOUT_TIME_MINUTES
             if profile.last_failed_login and timezone.now() < profile.last_failed_login + timedelta(minutes=lockout_time):
                 remaining_time = (profile.last_failed_login + timedelta(minutes=lockout_time) - timezone.now())
@@ -112,7 +117,6 @@ def login_view(request):
             profile.login_attempts += 1
             profile.last_failed_login = timezone.now()
             
-            # Check if should lock account
             if profile.login_attempts >= settings.MAX_FAILED_LOGIN_ATTEMPTS:
                 profile.is_locked = True
                 messages.error(request, "Account locked due to multiple failed login attempts.")
@@ -121,7 +125,6 @@ def login_view(request):
                 
             profile.save()
             
-            # Log the failed login
             LoginLog.objects.create(
                 user_id=User.objects.get(username=username).id,
                 successful=False,
@@ -131,7 +134,8 @@ def login_view(request):
             
             return render(request, 'authentication/login.html', {'form': form})
         
-        # If face recognition is required
+        # Face recognition if required
+        score = None
         if profile.face_encoding:
             if not face_data:
                 messages.error(request, "Face verification required. Please allow camera access.")
@@ -142,7 +146,6 @@ def login_view(request):
                 format, imgstr = face_data.split(';base64,')
                 face_image = base64.b64decode(imgstr)
                 
-                # Create a BytesIO object
                 from io import BytesIO
                 import tempfile
                 from PIL import Image
@@ -154,7 +157,6 @@ def login_view(request):
                 # Compare faces
                 match, score, error = compare_faces(profile.face_encoding, temp_file.name)
                 
-                # Clean up the temp file
                 import os
                 os.unlink(temp_file.name)
                 
@@ -163,7 +165,6 @@ def login_view(request):
                     return render(request, 'authentication/login.html', {'form': form})
                 
                 if not match:
-                    # Record failed login due to face mismatch
                     profile.login_attempts += 1
                     profile.last_failed_login = timezone.now()
                     
@@ -175,7 +176,6 @@ def login_view(request):
                         
                     profile.save()
                     
-                    # Log the failed login
                     LoginLog.objects.create(
                         user=user,
                         successful=False,
@@ -187,20 +187,28 @@ def login_view(request):
                     return render(request, 'authentication/login.html', {'form': form})
             
             except Exception as e:
+                logger.error(f"Face verification error: {str(e)}")
                 messages.error(request, f"Error during face verification: {str(e)}")
                 return render(request, 'authentication/login.html', {'form': form})
         
-        # Create digital signature challenge
-        token, expires_at = create_login_challenge(user)
-        signature = sign_login_challenge(profile, token)
-        
-        # Save signature to database
-        DigitalSignature.objects.create(
-            user=user,
-            token=token,
-            signature=signature,
-            expires_at=expires_at
-        )
+        # Digital signature creation with error handling
+        try:
+            token, expires_at = create_login_challenge(user)
+            signature = sign_login_challenge(profile, token)
+            
+            if not signature:
+                raise ValueError("Failed to generate digital signature")
+            
+            DigitalSignature.objects.create(
+                user=user,
+                token=token,
+                signature=signature,  # Corrected parameter name
+                expires_at=expires_at
+            )
+        except Exception as e:
+            logger.error(f"Digital signature creation failed: {str(e)}")
+            messages.error(request, "Error during login process. Please try again.")
+            return render(request, 'authentication/login.html', {'form': form})
         
         # Reset login attempts on successful login
         profile.login_attempts = 0
@@ -213,7 +221,7 @@ def login_view(request):
             successful=True,
             ip_address=get_client_ip(request),
             user_agent=request.META.get('HTTP_USER_AGENT', ''),
-            face_match_score=score if 'score' in locals() else None,
+            face_match_score=score if score is not None else None,
             signature_verified=True
         )
         
@@ -227,21 +235,33 @@ def login_view(request):
 
 @login_required
 def dashboard_view(request):
+    # Ensure user has a profile
+    try:
+        profile = request.user.profile
+    except UserProfile.DoesNotExist:
+        profile = UserProfile.objects.create(user=request.user)
+    
     # Get recent login history
     login_logs = LoginLog.objects.filter(user=request.user).order_by('-timestamp')[:5]
     
     context = {
         'user': request.user,
         'login_logs': login_logs,
-        'has_face_data': bool(request.user.profile.face_encoding)
+        'has_face_data': bool(profile.face_encoding)
     }
     
     return render(request, 'authentication/dashboard.html', context)
 
 @login_required
 def profile_view(request):
+    # Ensure user has a profile
+    try:
+        profile = request.user.profile
+    except UserProfile.DoesNotExist:
+        profile = UserProfile.objects.create(user=request.user)
+    
     if request.method == 'POST':
-        form = UserProfileForm(request.POST, request.FILES, instance=request.user.profile)
+        form = UserProfileForm(request.POST, request.FILES, instance=profile)
         
         if 'face_data' in request.POST and request.POST['face_data']:
             try:
@@ -265,8 +285,8 @@ def profile_view(request):
                     messages.error(request, error)
                 else:
                     # Save the face encoding
-                    request.user.profile.face_encoding = encoding_bytes
-                    request.user.profile.save()
+                    profile.face_encoding = encoding_bytes
+                    profile.save()
                     messages.success(request, "Face updated successfully!")
                 
                 # Clean up the temp file
@@ -281,11 +301,11 @@ def profile_view(request):
             messages.success(request, "Profile updated successfully!")
             return redirect('authentication:profile')
     else:
-        form = UserProfileForm(instance=request.user.profile)
+        form = UserProfileForm(instance=profile)
     
     context = {
         'form': form,
-        'has_face_data': bool(request.user.profile.face_encoding)
+        'has_face_data': bool(profile.face_encoding)
     }
     return render(request, 'authentication/profile.html', context)
 
@@ -312,9 +332,14 @@ def verify_face_view(request):
         from django.contrib.auth.models import User
         try:
             user = User.objects.get(username=username)
-            profile = user.profile
-        except (User.DoesNotExist, UserProfile.DoesNotExist):
+        except User.DoesNotExist:
             return JsonResponse({'success': False, 'error': 'User not found'})
+            
+        # Get or create profile
+        try:
+            profile = user.profile
+        except UserProfile.DoesNotExist:
+            profile = UserProfile.objects.create(user=user)
         
         if not profile.face_encoding:
             return JsonResponse({'success': False, 'error': 'No face data registered for this user'})
