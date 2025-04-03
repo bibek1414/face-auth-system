@@ -10,11 +10,11 @@ from datetime import timedelta
 import json
 import base64
 import logging
-import generate_key_pair
+
 from .forms import CustomUserCreationForm, CustomAuthenticationForm, UserProfileForm
 from .models import UserProfile, LoginLog, DigitalSignature
 from .face_utils import process_face_image, compare_faces
-from .crypto_utils import create_login_challenge, sign_login_challenge, verify_login_signature
+from .crypto_utils import create_login_challenge, sign_login_challenge, verify_login_signature , generate_key_pair
 logger = logging.getLogger(__name__)
 def register_view(request):
     if request.method == 'POST':
