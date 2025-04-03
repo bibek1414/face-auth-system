@@ -10,6 +10,7 @@ from datetime import timedelta
 import json
 import base64
 import logging
+import generate_key_pair
 from .forms import CustomUserCreationForm, CustomAuthenticationForm, UserProfileForm
 from .models import UserProfile, LoginLog, DigitalSignature
 from .face_utils import process_face_image, compare_faces
@@ -20,6 +21,19 @@ def register_view(request):
         form = CustomUserCreationForm(request.POST, request.FILES)
         if form.is_valid():
             user = form.save()
+            
+            # Generate key pair for the new user
+            try:
+                public_key, private_key = generate_key_pair()
+                
+                # Get or create profile
+                profile, created = UserProfile.objects.get_or_create(user=user)
+                profile.public_key = public_key
+                profile.private_key = private_key
+                profile.save()
+            except Exception as e:
+                logger.error(f"Key generation failed during registration: {str(e)}")
+                messages.warning(request, "Account created but security features could not be initialized.")
             
             # Process face image if provided
             if 'face_data' in request.POST and request.POST['face_data']:
@@ -191,6 +205,23 @@ def login_view(request):
                 messages.error(request, f"Error during face verification: {str(e)}")
                 return render(request, 'authentication/login.html', {'form': form})
         
+        # Check if the user has keys, generate if not
+        if not profile.public_key or not profile.private_key:
+            try:
+                # Generate new key pair
+                public_key, private_key = generate_key_pair()
+                
+                # Save keys to profile
+                profile.public_key = public_key
+                profile.private_key = private_key
+                profile.save()
+                
+                logger.info(f"Generated new key pair for user {user.username}")
+            except Exception as e:
+                logger.error(f"Key generation failed: {str(e)}")
+                messages.error(request, "Error setting up security credentials. Please contact support.")
+                return render(request, 'authentication/login.html', {'form': form})
+        
         # Digital signature creation with error handling
         try:
             token, expires_at = create_login_challenge(user)
@@ -232,7 +263,6 @@ def login_view(request):
         form = CustomAuthenticationForm()
     
     return render(request, 'authentication/login.html', {'form': form})
-
 @login_required
 def dashboard_view(request):
     # Ensure user has a profile
@@ -317,7 +347,8 @@ def logout_view(request):
 @require_POST
 def verify_face_view(request):
     """AJAX endpoint to verify face without completing login"""
-    if not request.is_ajax():
+    
+    if not request.headers.get('X-Requested-With') == 'XMLHttpRequest':
         return JsonResponse({'success': False, 'error': 'Invalid request'})
     
     try:
